@@ -1,0 +1,48 @@
+# JPL Small-Body Identification API Client
+
+## What It Is About  
+This client interfaces with NASA JPL’s Small-Body Identification API to find asteroids, comets, and other small bodies known to pass through a specified field of view (FOV) in the sky at a given observation time.
+
+---
+
+## How It Works
+
+1. **Coordinate Conversion for API**  
+   Right ascension (RA) and declination (Dec) are converted from decimal degrees into the specific sexagesimal format expected by the JPL API.
+
+2. **Safe Parsing and Filtering**  
+   The client carefully parses JPL API responses, cleaning and converting string values for magnitudes, offsets, and other measurements into float numbers with tolerance for missing or malformed data.
+
+3. **Request with Retry Logic**  
+   HTTP requests to JPL’s API are retried up to a set number of times for transient errors such as server errors or timeouts, improving reliability.
+
+4. **Known Object Query**  
+   Takes parameters like center position (RA, Dec), radius, observation time, observer location, and search options (two-pass mode, magnitude requirement).  
+
+   Sends the query to JPL, obtains raw results, and applies client-side filters:  
+   - Removes objects too far from the center (accounting for FOV diagonal).  
+   - Filters out objects that are too faint based on visual magnitude limit.  
+   - Sorts results by magnitude, offset, or name.  
+   - Limits number of returned objects.
+
+5. **Output**  
+   Returns detailed filtered results, including counts of objects at each filtering step and the final list of known objects matching the criteria.
+
+---
+
+## Notes from Empirical Testing
+
+- **Two-pass mode false**: Fast (2-5s), returns thousands of objects, suitable for realtime API usage.  
+- **Two-pass mode true**: Slow (>120s), not practical for HTTP endpoints.  
+- **mag_required false**: Returns objects outside FOV due to orbital uncertainties, so additional filtering is necessary client-side.  
+- **mag_required true**: Respects FOV limits but excludes objects without magnitude info.  
+- API sometimes transiently returns HTTP 500 errors—retries help mitigate this.
+
+---
+
+## Why It Matters
+
+This client enables seamless integration with JPL’s asteroid/comet databases, crucial for identifying known small bodies in a SPHEREx field of view, aiding discovery, cataloging, and threat assessment.
+
+---
+

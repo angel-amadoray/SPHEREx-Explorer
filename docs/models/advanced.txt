@@ -1,0 +1,37 @@
+# Data Models for Advanced Spectral Analysis
+
+## What They Represent  
+These data models define structured formats for representing detailed results of spectral and photometric analyses of SPHEREx observations—specifically focused on paired detector data, pixel brightness, and target suggestion.
+
+---
+
+## Key Models Explained
+
+### DetectorSample  
+Represents measurements from a single detector for a specific pixel, including its location, flux, signal-to-noise ratio (SNR), and wavelength details.
+
+### PairClassification  
+Encodes the classification of spectral features in a paired detector analysis, such as whether the source shows absorption lines, emission, continuum, or if it’s masked or undetermined.
+
+### PairSpectrumResponse  
+Aggregates data for a pair of detectors observing the same sky position, including classification, flux ratio, and whether cached data was used.
+
+### BrightPixel & BrightestPixelsResponse  
+Describe individual bright pixels in a detector image and provide a response listing the N brightest pixels along with their celestial coordinates.
+
+### SuggestedTarget & SuggestTargetResponse  
+Represent a selected target pixel confirmed to have valid flux in both short- and long-wavelength detectors, along with metadata about how many candidate pixels were examined and reasons for selection or failure.
+
+### BrightPixelItem & BrightestValidResponse  
+Represent detailed measurements for top bright pixels valid in paired detectors, including ranks, fluxes, SNRs, pixel coordinates, and flux ratios.
+
+### Extended PairClassification (stellar types)  
+Classifies objects based on spectral analysis into stars of different temperature classes (hot star, sun-like star, cool star, etc.), including estimated color temperature and confidence levels.
+
+---
+
+## Use in Practice  
+These models provide a standardized way to exchange detailed analytical results between backend services, helping astronomers precisely characterize and select interesting targets for further study.
+
+---
+

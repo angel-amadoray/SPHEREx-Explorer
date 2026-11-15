@@ -1,0 +1,206 @@
+# Python Code Documentation – SPHEREx Spectral Image Processing
+
+This documentation explains the Python code you provided, including its imports, logger configuration, and colormap anchor definitions. It describes the purpose of each component, how it works, and why it is important for the image-processing pipeline.
+
+## 1. Python Imports
+
+**Original code:**
+
+```
+from __future__ import annotations
+
+import io
+import logging
+
+import numpy as np
+from astropy.io import fits
+from PIL import Image
+from scipy.ndimage import median_filter
+```
+
+**Explanation:**
+
+This section imports the libraries and modules required for processing astronomical data, manipulating images, and recording program activity.
+
+- **`from __future__ import annotations`**
+
+  Enables postponed evaluation of type annotations. Instead of evaluating type hints immediately, Python stores them in a form that can be evaluated later.
+
+  This makes it easier to reference classes or types that may not yet be defined. It also helps avoid certain circular-import and forward-reference problems.
+- **`import io`**
+
+  Imports Python's built-in input/output module.
+
+  It provides tools for working with data in memory. In image processing, `io.BytesIO` can create a file-like object in memory, allowing an image to be generated or processed without immediately saving it to disk.
+- **`import logging`**
+
+  Imports Python's logging module, which allows the program to record information about its execution.
+
+  Logging helps developers monitor operations, identify errors, and understand what happens during image processing.
+- **`import numpy as np`**
+
+  Imports NumPy, a fundamental library for numerical computing.
+
+  NumPy provides multidimensional arrays and mathematical operations that are particularly useful for astronomical images.
+
+  Since FITS images contain numerical pixel values, NumPy allows the program to manipulate and analyze this data efficiently.
+
+  The abbreviation `np` is used to make NumPy functions easier to reference.
+- **`from astropy.io import fits`**
+
+  Imports the FITS module from Astropy.
+
+  FITS stands for *Flexible Image Transport System*, a standard file format widely used in astronomy.
+
+  This module allows the program to open, read, manipulate, and save astronomical data files, including their scientific metadata and image information.
+- **`from PIL import Image`**
+
+  Imports the Image module from Pillow, a Python imaging library.
+
+  Pillow provides functionality for creating, manipulating, converting, and saving images.
+
+  In this project, it can be used to convert processed astronomical data into a visual image format.
+- **`from scipy.ndimage import median_filter`**
+
+  Imports the median filter function from SciPy.
+
+  A median filter is an image-processing technique that examines neighboring pixels and replaces a pixel's value with the median of the values within a specified neighborhood.
+
+  It is commonly used to reduce certain types of noise and smooth image data.
+
+  Depending on how it is applied, it can also help prepare images for visualization. However, filtering scientific data should be done carefully because it can alter real astronomical signals.
+
+**Overall purpose:**
+
+These imports provide the essential tools for reading astronomical FITS files, performing numerical operations, applying image-processing techniques, generating visual representations, and monitoring program execution.
+
+---
+
+## 2. Logger Configuration
+
+**Original code:**
+
+```
+logger = logging.getLogger(__name__)
+```
+
+**Explanation:**
+
+This line creates or retrieves a logger associated with the current Python module.
+
+A logger is an object that records messages about the execution of a program. It helps developers understand which operations are being performed and identify potential problems.
+
+The components are:
+
+- **`logging.getLogger()`**: Retrieves a logger object. If a logger with the specified name does not exist, it creates one.
+- **`__name__`**: A special Python variable containing the name of the current module.
+- **`logger`**: The variable used to access the logger throughout the program.
+
+For example:
+
+```
+logger.info("spectral_paint done")
+```
+
+This records an informational message indicating that the `spectral_paint` operation has finished.
+
+Python logging supports several message levels:
+
+| Level      | Purpose                                          |
+| ---------- | ------------------------------------------------ |
+| `DEBUG`    | Detailed information for debugging.              |
+| `INFO`     | General information about program execution.     |
+| `WARNING`  | Indicates a potential problem.                   |
+| `ERROR`    | Reports an operation that failed.                |
+| `CRITICAL` | Reports a serious problem affecting the program. |
+
+**Importance in the project:**
+
+Logging makes the image-processing pipeline easier to monitor and maintain. It allows developers to track processing stages, identify failures, and understand the behavior of the application without relying on print statements.
+
+---
+
+## 3. Colormap Anchor Definitions
+
+**Original code:**
+
+```
+_COLORMAP_ANCHORS = [
+    (0.00, (0.20, 0.00, 0.55)),
+    (0.20, (0.00, 0.25, 1.00)),
+    (0.40, (0.00, 0.90, 1.00)),
+    (0.60, (0.30, 1.00, 0.00)),
+    (0.80, (1.00, 0.90, 0.00)),
+    (1.00, (1.00, 0.15, 0.00)),
+]
+```
+
+**Explanation:**
+
+This section defines a custom color map using a list of anchor points.
+
+A colormap is a system that converts numerical values into colors. In astronomical image visualization, this allows numerical pixel intensities to be represented using different colors, making variations in the data easier to observe.
+
+The variable `_COLORMAP_ANCHORS` contains several tuples, each representing a specific position in the color map and its corresponding RGB color.
+
+Each tuple has two components:
+
+1. **Position:** A normalized numerical value between `0.0` and `1.0`, representing a location within the color scale.
+2. **RGB color:** Three numerical values representing the intensity of red, green, and blue.
+
+Each RGB component ranges from `0.0` to `1.0`:
+
+- `0.0` represents the absence of that color component.
+- `1.0` represents its maximum intensity.
+
+### 3.1. Color anchor breakdown
+
+| Position | RGB values           | Approximate color |
+| -------- | -------------------- | ----------------- |
+| `0.00`   | `(0.20, 0.00, 0.55)` | Purple            |
+| `0.20`   | `(0.00, 0.25, 1.00)` | Blue              |
+| `0.40`   | `(0.00, 0.90, 1.00)` | Cyan              |
+| `0.60`   | `(0.30, 1.00, 0.00)` | Green             |
+| `0.80`   | `(1.00, 0.90, 0.00)` | Yellow            |
+| `1.00`   | `(1.00, 0.15, 0.00)` | Red               |
+
+### 3.2. How the colormap works
+
+The positions define the transition between colors.
+
+For example:
+
+- Values near `0.00` are represented using purple.
+- Values near `0.20` are represented using blue.
+- Values near `0.40` are represented using cyan.
+- Values near `0.60` are represented using green.
+- Values near `0.80` are represented using yellow.
+- Values near `1.00` are represented using red.
+
+Values between the anchor points can be assigned intermediate colors through interpolation.
+
+For example, a normalized value of `0.50` falls between the cyan and green anchors. Its resulting color would be a mixture of those two colors.
+
+**Importance in the project:**
+
+The colormap provides a consistent visual representation of numerical astronomical data. It helps distinguish different pixel-intensity levels and makes structures and variations in spectral images easier to identify.
+
+It is important to note that these colors are visualization choices, not the actual colors of astronomical objects or necessarily their physical spectral colors.
+
+---
+
+## 4. Overall Purpose of These Components
+
+The three sections work together as part of an astronomical image-processing pipeline.
+
+| Component            | Main responsibility                                                                           |
+| -------------------- | --------------------------------------------------------------------------------------------- |
+| Python imports       | Provide the libraries required for reading, processing, and manipulating astronomical images. |
+| Logger configuration | Record program activity and help monitor processing operations.                               |
+| Colormap anchors     | Define how numerical image values are translated into visual colors.                          |
+
+**Conclusion**
+
+These components establish the foundation for processing and visualizing SPHEREx astronomical data. The imported libraries provide the necessary numerical and image-processing functionality, the logger supports execution monitoring, and the custom colormap transforms numerical pixel values into a color representation that makes astronomical structures easier to visualize and interpret.
+
+**Documentation note:** The colormap alone does not perform the image conversion. Additional code must normalize the pixel values, interpolate between the color anchors, and generate the final image.

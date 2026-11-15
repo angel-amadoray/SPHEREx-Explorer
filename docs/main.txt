@@ -1,0 +1,38 @@
+# SPHEREx Backend Application (FastAPI)
+
+## What It Is About  
+This is the main setup of the SPHEREx backend web application built with FastAPI. It configures application lifespan, logging, static file serving, CORS, health checks, and API routers for different functional modules.
+
+---
+
+## Key Features
+
+### Application Lifespan and Initialization  
+- Initializes logging with configured log level.  
+- Creates necessary directories for static files, cache, and data storage.  
+- Loads hotspot catalog from JSON file into app state for global access.  
+- Logs startup and shutdown events.
+
+### Middleware and Static Files Serving  
+- Adds Cross-Origin Resource Sharing (CORS) middleware allowing origins configured via environment.  
+- Serves static files from the configured `static_dir` path under `/static` URL.
+
+### Health Endpoint  
+- Provides a simple readiness/liveness probe at `/health` returning status, environment, and version info.
+
+### API Routing  
+- Includes routers for:  
+  - Hotspots  
+  - Images  
+  - Analytics  
+  - Advanced Analytics  
+  - Astrometry  
+  - Debugging
+
+Each router is mounted under `/api` prefix, organizing REST endpoints according to functionality.
+
+---
+
+## Why It Matters
+
+This setup centralizes and automates the core backend configuration, enabling robust, scalable, and maintainable API service for SPHEREx spectral data processing.

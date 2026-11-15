@@ -1,0 +1,43 @@
+---
+
+# Hotspot Data Models and Catalog
+
+## What They Represent  
+These models and classes define how sky sectors of interest (“hotspots”) are described, validated, and loaded from data files to be used throughout the SPHEREx application.
+
+---
+
+## Key Components
+
+### Hotspot  
+Describes a single sky sector, including:
+
+- **id**: Unique identifier using lowercase letters, digits, and underscores.  
+- **name**: Human-readable name.  
+- **description**: Optional textual info.  
+- **ra** and **dec**: Coordinates in degrees identifying the center of the hotspot.  
+- **size_deg**: Angular size of the hotspot in degrees.  
+- **epochs**: List of observation epochs available for this sector, must be unique.  
+- **thumbnail_url**: Optional link to a preview image.
+
+The model enforces:
+
+- Non-empty IDs matching a strict pattern.  
+- RA and Dec within valid celestial ranges.  
+- Epochs list with no duplicates.
+
+### HotspotsCatalog  
+Manages loading and validating the hotspots data:
+
+- Loads the JSON file (`data/hotspots.json`) once at startup.  
+- Checks file presence and format correctness.  
+- Ensures no duplicate IDs.  
+- Provides methods to access all hotspots or retrieve one by ID.
+
+---
+
+## Practical Use  
+This structure ensures that all hotspots used in the system are valid, uniquely identified, and easily accessible with their associated metadata and available observation epochs.
+
+---
+

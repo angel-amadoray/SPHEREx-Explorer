@@ -1,0 +1,191 @@
+# Advanced Analytics API Module
+
+## What It Is About  
+This module provides advanced spectral analysis tools for examining detailed pixel-level data from SPHEREx observations. It supports analyzing paired detector bands, locating the brightest pixels, suggesting targets visible in multiple detectors, and filtering pixels with valid fluxes across detectors.
+
+---
+
+## How It Works
+
+### 1. Analyzing Paired Spectral Bands  
+At a specified celestial coordinate (RA, Dec), this endpoint determines which detector pair covers the point and measures fluxes in both bands. It computes and classifies the ratio of long-wavelength flux to short-wavelength flux, useful for detailed spectral characterization.
+
+```python
+@router.get("/pair-spectrum", response_model=PairSpectrumResponse)
+def pair_spectrum(request: Request, sector_id: str, epoch: str, ra_deg: float, dec_deg: float,
+                  obs_id: str | None = None, visit: int | None = None):
+    # Validation of sector and epoch
+    hotspot = request.app.state.hotspots.get(sector_id)
+    if hotspot is None: raise HTTPException(404, ...)
+    if epoch not in hotspot.epochs: raise HTTPException(400, ...)
+
+    params = {"sector_id": sector_id, "epoch": epoch, "ra_deg": round(ra_deg,5), "dec_deg": round(dec_deg,5)}
+    # Cache retrieval
+    hit = cache.get("advanced_pair", params)
+    if hit:
+        try:
+            payload = json.loads(hit.read_text(encoding="utf-8"))
+            return PairSpectrumResponse(**payload, cached=True)
+        except Exception:
+            logger.warning("Corrupt cache; recomputing")
+
+    # Perform spectral pair analysis
+    result = aa.analyze_pair(sector_id, epoch, ra_deg, dec_deg, obs_id, visit)
+    response = PairSpectrumResponse(**result, cached=False)
+    data = response.model_dump()
+    data.pop("cached", None)
+    cache.put("advanced_pair", params, json.dumps(data, indent=2).encode("utf-8"))
+    return response
+```
+
+---
+
+### 2. Retrieve Brightest Pixels  
+Returns the top N pixels with highest flux in a given detector, along with their celestial coordinates. Useful for identifying real targets for further analysis.
+
+```python
+@router.get("/brightest-pixels", response_model=BrightestPixelsResponse)
+def brightest_pixels(request: Request, sector_id: str, epoch: str, detector: int = 1,
+                     top_n: int = 10, obs_id: str | None = None, visit: int | None = None):
+    hotspot = request.app.state.hotspots.get(sector_id)
+    if hotspot is None: raise HTTPException(404, ...)
+    if epoch not in hotspot.epochs: raise HTTPException(400, ...)
+
+    hdul = fl.load_local_fits(sector_id, epoch, detector, obs_id, visit)
+    clean = fl.get_clean_image(hdul, subtract_zodi=True)
+    valid = (clean > 0) & np.isfinite(clean)
+    if valid.sum() == 0:
+        return BrightestPixelsResponse(sector_id=sector_id, epoch=epoch, detector=detector, n_pixels=0, pixels=[])
+
+    masked = np.where(valid, clean, 0.0)
+    flat = masked.ravel()
+    top_idx = np.argpartition(flat, -top_n)[-top_n:]
+    ys, xs = np.unravel_index(top_idx, clean.shape)
+    wcs = fl.get_spatial_wcs(hdul)
+
+    pixels = []
+    for x, y in zip(xs, ys):
+        ra, dec = wcs.all_pix2world(float(x), float(y), 0)
+        pixels.append(BrightPixel(pixel_x=int(x), pixel_y=int(y), flux=float(clean[y, x]), ra_deg=float(ra), dec_deg=float(dec)))
+    hdul.close()
+
+    pixels.sort(key=lambda p: -p.flux)
+    return BrightestPixelsResponse(sector_id=sector_id, epoch=epoch, detector=detector, n_pixels=len(pixels), pixels=pixels[:top_n])
+```
+
+---
+
+### 3. Suggesting Targets Visible in Detector Pairs  
+Finds a pixel with valid flux in BOTH short- and long-wavelength detectors using the following strategy:
+
+- Load both detectors  data.  
+- Identify top bright pixels in the short detector.  
+- Convert pixel locations to celestial coordinates.  
+- Verify corresponding pixel in the long detector has positive flux.  
+- Return first pixel meeting minimum signal-to-noise ratio (SNR) criteria in both.
+
+```python
+@router.get("/suggest-target", response_model=SuggestTargetResponse)
+def suggest_target(request: Request, sector_id: str, epoch: str, detector_short: int = 1,
+                   detector_long: int = 4, obs_id: str | None = None, visit: int | None = None,
+                   min_snr: float = 10.0, max_candidates: int = 30):
+    # Validate sector and epoch
+    hotspot = request.app.state.hotspots.get(sector_id)
+    if hotspot is None: raise HTTPException(404, ...)
+    if epoch not in hotspot.epochs: raise HTTPException(400, ...)
+
+    hdul_s = fl.load_local_fits(sector_id, epoch, detector_short, obs_id, visit)
+    hdul_l = fl.load_local_fits(sector_id, epoch, detector_long, obs_id, visit)
+
+    clean_s = fl.get_clean_image(hdul_s, subtract_zodi=True)
+    clean_l = fl.get_clean_image(hdul_l, subtract_zodi=True)
+    valid_s = (clean_s > 0) & np.isfinite(clean_s)
+
+    masked_s = np.where(valid_s, clean_s, 0.0)
+    flat = masked_s.ravel()
+    top_idx = np.argpartition(flat, -max_candidates)[-max_candidates:]
+    ys, xs = np.unravel_index(top_idx, clean_s.shape)
+
+    wcs_s = fl.get_spatial_wcs(hdul_s)
+    wcs_l = fl.get_spatial_wcs(hdul_l)
+
+    for x_s, y_s in zip(xs, ys):
+        ra, dec = wcs_s.all_pix2world(float(x_s), float(y_s), 0)
+        raw = wcs_l.all_world2pix(ra, dec, 0)
+        x_l, y_l = int(round(raw[0])), int(round(raw[1]))
+        if x_l < 0 or y_l < 0 or x_l >= clean_l.shape[1] or y_l >= clean_l.shape[0]:
+            continue
+
+        short_r = _photometry_and_snr(...)  # standard photometry function
+        long_r = _photometry_and_snr(...)
+
+        if short_r["flux"] > 0 and long_r["flux"] > 0 and short_r["snr"] >= min_snr and long_r["snr"] >= min_snr:
+            return SuggestTargetResponse(target=..., reason="Found pixel valid in both detectors")
+
+    hdul_s.close()
+    hdul_l.close()
+    return SuggestTargetResponse(reason="No suitable pixel found")
+```
+
+---
+
+### 4. Retrieving Brightest Valid Pixels in Detector Pairs  
+Returns the top N brightest pixels in the short detector with valid flux also detected in the long detector, filtering out saturated or masked pixels.
+
+```python
+@router.get("/brightest-valid", response_model=BrightestValidResponse)
+def brightest_valid(request: Request, sector_id: str, epoch: str, detector_short: int = 1,
+                    detector_long: int = 4, top_n: int = 20, min_snr: float = 10.0,
+                    obs_id: str | None = None, visit: int | None = None):
+    hotspot = request.app.state.hotspots.get(sector_id)
+    if hotspot is None: raise HTTPException(404, ...)
+    if epoch not in hotspot.epochs: raise HTTPException(400, ...)
+
+    hdul_s = fl.load_local_fits(sector_id, epoch, detector_short, obs_id, visit)
+    hdul_l = fl.load_local_fits(sector_id, epoch, detector_long, obs_id, visit)
+
+    image_s = get_clean_image(hdul_s, subtract_zodi=True)
+    flags_s = hdul_s["FLAGS"].data
+    valid_s = (flags_s & BAD_BITS) == 0
+    clean_s = np.where(valid_s, image_s, 0.0)
+
+    image_l = get_clean_image(hdul_l, subtract_zodi=True)
+    flags_l = hdul_l["FLAGS"].data
+    valid_l = (flags_l & BAD_BITS) == 0
+
+    flat = clean_s.ravel()
+    n_candidates = min(top_n * 10, 500)
+    top_idx = np.argpartition(flat, -n_candidates)[-n_candidates:]
+    ys, xs = np.unravel_index(top_idx, clean_s.shape)
+    order = np.argsort(-flat[top_idx])
+    ys, xs = ys[order], xs[order]
+
+    results = []
+    for x_s, y_s in zip(xs, ys):
+        if len(results) >= top_n:
+            break
+        ra, dec = get_ra_dec(...)
+        x_l, y_l = convert_to_long_detector(ra, dec)
+        fs, snr_s = _quick_photometry(x_s, y_s, image_s, valid_s)
+        fl_, snr_l = _quick_photometry(x_l, y_l, image_l, valid_l)
+
+        if fs > 0 and fl_ > 0 and snr_s >= min_snr and snr_l >= min_snr:
+            results.append(BrightPixelItem(...))
+
+    hdul_s.close()
+    hdul_l.close()
+
+    return BrightestValidResponse(n_valid=len(results), pixels=results)
+```
+
+---
+
+## Benefits  
+- Enables refined pixel-level spectral analysis across paired detectors.  
+- Supports searching for valid targets with high signal quality in multi-band observations.  
+- Provides rapid photometry calculations without reloading raw files repeatedly.  
+- Facilitates construction of scientifically meaningful, validated target catalogs.
+
+## Use Cases  
+Ideal for astronomers needing detailed spectral characterization of sources, pipeline steps requiring inter-detector cross-validation, and automated target selection for follow-up studies.
+

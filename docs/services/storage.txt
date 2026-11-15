@@ -1,0 +1,37 @@
+# OCI Object Storage Client for SPHEREx Data
+
+## Overview  
+This client manages the storage, retrieval, and synchronization of SPHEREx FITS files using Oracle Cloud Infrastructure (OCI) Object Storage, which is compatible with the S3 protocol.
+
+---
+
+## Core Functionalities
+
+### Configuration Validation  
+Checks if all necessary credentials and settings (endpoint, access key, secret key, bucket name) are properly set before allowing operations.
+
+### Client Initialization  
+Creates a boto3 S3 client configured to work with OCI’s specific requirements for authentication and multipart upload compatibility.
+
+### Remote Key and Local Path Management  
+- Builds remote object keys preserving the directory structure as `<prefix>/<sector>/<epoch>/<filename>`.  
+- Constructs local directory paths following the local data hierarchy `<data_dir>/<sector>/<epoch>`.
+
+### Listing Files Remotely  
+Retrieves lists of available FITS files for any sector and epoch from the remote OCI bucket, paginating through results and filtering for relevant files.
+
+### Downloading Files  
+Downloads specified FITS files from OCI, ensuring directory creation and cleaning up incomplete downloads on failure.
+
+### Download If Missing (Main Entry)  
+- Checks for local existence of the requested FITS file using detector, observation id, and visit filters.  
+- If missing and downloads enabled, lists remote files, finds the unique matching candidate, and downloads it.  
+- Throws descriptive exceptions for missing configuration, ambiguous matches, or failures.
+
+### Uploading Files  
+Uploads local FITS files back to remote OCI under appropriate keys, logging progress and file sizes.
+
+---
+
+## Why It Matters  
+This client allows SPHEREx data processing pipelines to transparently access and cache large volumes of observational FITS data, leveraging cloud storage for scalability and reliability without burdening local storage.

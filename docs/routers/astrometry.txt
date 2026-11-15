@@ -1,0 +1,78 @@
+# Astrometry API Module
+
+## What It Is About  
+This module provides an API endpoint that returns the World Coordinate System (WCS) information for astronomical FITS images. WCS enables conversion between sky coordinates (Right Ascension and Declination) and image pixels, which is essential for frontend visualizations, diagnostics, and spatial analysis.
+
+## How It Works
+
+### 1. Sector and Epoch Validation  
+The service first validates that the requested sky sector exists and that the specified observation epoch is valid for that sector. It also validates that the requested detector number is within the allowed range.
+
+
+```python
+hotspot = request.app.state.hotspots.get(sector_id)
+if hotspot is None:
+    raise HTTPException(404, f"Sector '{sector_id}' not found")
+if epoch not in hotspot.epochs:
+    raise HTTPException(
+        400,
+        f"Epoch '{epoch}' not available for sector '{sector_id}'. "
+        f"Available: {hotspot.epochs}",
+    )
+if not (1 <= detector <= 6):
+    raise HTTPException(400, f"detector must be 1..6, got {detector}")
+```
+
+### 2. Loading Image Data  
+The module attempts to load the FITS file that corresponds to the provided sector, epoch, and detector identifiers. If the file does not exist or is invalid, an appropriate error is raised.
+
+```python
+try:
+    hdul = fl.load_local_fits(
+        sector_id=sector_id, epoch=epoch, detector=detector,
+        obs_id=obs_id, visit=visit,
+    )
+except FileNotFoundError as e:
+    raise HTTPException(404, f"No FITS found: {e}")
+except ValueError as e:
+    raise HTTPException(409, str(e))
+```
+
+
+### 3. Extracting and Serializing WCS Information  
+Once the FITS file is loaded, the service extracts the shape of the image and serializes the WCS data into a format suitable for JSON response. It handles exceptions that might occur during serialization and closes the file after processing.
+
+```python
+try:
+    shape = list(hdul["IMAGE"].data.shape)
+    wcs_dict = fl.serialize_wcs(hdul)
+except Exception as e:
+    logger.exception("Astrometry serialization failed")
+    raise HTTPException(500, f"WCS serialization failed: {e}")
+finally:
+    hdul.close()
+```
+
+### 4. Returning the Response  
+The API returns a structured response containing the sector, epoch, detector, image shape, and serialized WCS information. This response facilitates coordinate transformations on the client side.
+
+```python
+return AstrometryResponse(
+    sector_id=sector_id,
+    epoch=epoch,
+    detector=detector,
+    filename=f"det{detector}",
+    shape=shape,
+    wcs=AstrometryWCS(**wcs_dict),
+)
+```
+
+## Benefits  
+- Provides frontend applications with necessary spatial referencing data.  
+- Validates data availability and input parameters robustly.  
+- Gracefully handles file and serialization errors with clear error messages.  
+- Facilitates accurate sky-to-pixel coordinate conversions for visualization and analysis.
+
+## Use Cases  
+Useful for astronomical imaging platforms, scientific visualization tools, or any system needing to correctly map celestial objects within FITS images.
+

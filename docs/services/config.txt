@@ -1,0 +1,33 @@
+# Configuration Settings Module
+
+## What It Is About  
+This module loads and manages configuration settings for the SPHEREx backend application using environment variables and `.env` files, with defaults and type safety ensured by Pydantic.
+
+---
+
+## Key Features
+
+- Uses **`pydantic-settings`** for strongly typed settings management.  
+- Loads environment variables from a `.env` file for local development convenience.  
+- Supports settings related to:
+  - Application environment (e.g., development, production).  
+  - Server port and logging level.  
+  - Cross-Origin Resource Sharing (CORS) allowed origins.  
+  - S3-compatible buckets (default NASA IRSA bucket details).  
+  - Oracle Cloud Infrastructure (OCI) Object Storage credentials and options for storing FITS files.  
+  - Paths for static assets, cached data, sample FITS files, and hotspots catalog.
+
+---
+
+## How It Works
+
+- On initialization, environment variables are loaded with UTF-8 encoding support.  
+- The `Settings` class defines default values and reads overrides from environment variables, ignoring extra unknown settings.  
+- Sensitive credentials like OCI keys and bucket names are injected from environment variables for security.  
+- The global `settings` instance provides easy access throughout the app.
+
+---
+
+## Why This Matters
+
+Centralized configuration management simplifies deployment across environments, secures credentials, and ensures consistent behavior with typed validation and defaults.

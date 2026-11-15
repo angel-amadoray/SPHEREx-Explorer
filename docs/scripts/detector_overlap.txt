@@ -1,0 +1,33 @@
+# FITS WCS Coverage Checker Script
+
+## What It Does  
+This script checks whether specific sky coordinates (RA, Dec) fall inside the field of view of the different SPHEREx detectors, using their spatial WCS information.
+
+---
+
+## How It Works
+
+1. **File Discovery**  
+   Loads all FITS files from a specific sector and epoch directory.
+
+2. **Coordinate Check**  
+   For each coordinate to test, it converts the celestial coordinates (RA, Dec) to pixel coordinates for each detector’s image using the WCS transformation.
+
+3. **In-Frame Determination**  
+   Compares if the pixel coordinates lie within the image bounds.
+
+4. **Reporting**  
+   Prints the detector number, if the coordinate is inside or outside the image frame, and the pixel location. Summarizes how many detectors can see that point.
+
+---
+
+## Example Tests Provided
+
+- Center of Detector 1 (likely click point).  
+- Center of Detector 2 (overlap zone).  
+- Midpoint between Detectors 1 and 3 (another overlap zone).
+
+---
+
+## Why It’s Useful  
+Helps verify coverage and overlapping fields in SPHEREx data, useful to know which detectors observe a given sky location and to assist with data analysis or visualization.

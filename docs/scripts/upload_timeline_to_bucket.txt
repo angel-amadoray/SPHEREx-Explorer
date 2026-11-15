@@ -1,0 +1,47 @@
+# Timeline FITS Uploader to OCI Object Storage
+
+## What It Is About  
+This script uploads SPHEREx timeline FITS files to an Oracle Cloud Infrastructure (OCI) Object Storage bucket, organizing files in a structured hierarchy for easy access and management.
+
+---
+
+## Remote Structure  
+Files are uploaded under this key pattern:  
+```
+fits/timeline/{sector}/{obs_id}/v{N}/{filename}
+```
+Where `sector` is the sky sector, `obs_id` is the observation ID, and `v{N}` is the visit version folder.
+
+---
+
+## Usage  
+- Upload timeline files for a given sector and observation ID:  
+  ```bash
+  py scripts/upload_timeline_to_oci.py --sector orion_nebula --obs-id 0685
+  ```
+- List existing files in the timeline in OCI without uploading:  
+  ```bash
+  py scripts/upload_timeline_to_oci.py --sector orion_nebula --obs-id 0685 --list
+  ```
+
+---
+
+## How It Works
+
+1. **OCI Client Setup**  
+   Validates necessary credentials from environment `.env` and creates a boto3 client configured for OCI.
+
+2. **Listing Remote Files**  
+   Optionally lists files in the remote OCI bucket under the timeline prefix.
+
+3. **File Uploading**  
+   - Walks local timeline directories matching the sector and observation ID.  
+   - Iterates through visit folders (e.g., v1, v2...) and selects `.fits` files.  
+   - Checks remotely if a file with the same size already exists to avoid redundant uploading.  
+   - Uploads missing or changed files, logging progress.  
+   - Tracks counts of uploaded and skipped files.
+
+---
+
+## Why It Matters  
+This utility facilitates efficient synchronization of local timeline FITS data with cloud storage, enabling scalable remote data access for SPHEREx scientific workflows.

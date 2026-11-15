@@ -1,0 +1,70 @@
+
+# SPHEREx Image Difference Engine (Phase 4, Version 3)
+
+## What It Is About  
+This engine compares two astronomical images taken at different times (or conditions) to highlight changes in brightness or structure. It cleans the images, aligns them spatially, subtracts background noise, calculates differences, estimates local noise, applies thresholds to identify significant changes, handles bright stars masking, and produces a visually intuitive heatmap.
+
+---
+
+## Key Improvements in Version 3
+
+- Faster and more precise 2D background estimation via downsampling, median filtering, Gaussian smoothing, and upsampling.  
+- Background subtraction applied after spatial reprojection to cancel residual gradients by rows.  
+- Local noise estimation using blocks inspired by the SExtractor method, scaling well with image size.  
+- Default settings maintain sensitivity with absolute difference and row-based background subtraction.  
+- Improved star masking allowing control over threshold calculation mask and display mask separately.
+
+---
+
+## Main Processing Steps
+
+1. **2D Background Estimation**  
+   Downsample the image, filter medians to remove point sources, smooth with Gaussian, then upsample back to original size. This gives a smooth background map.
+
+2. **Spatial Alignment (WCS Reprojection)**  
+   Reproject the second image onto the coordinate grid of the first to align spatially, producing an aligned image and coverage footprint.
+
+3. **Background Subtraction**  
+   Subtract background using modes:  
+   - "row": median subtraction per spectral row (fast and effective)  
+   - "2d": 2D background estimated as above  
+   - "none": no background subtraction
+
+4. **Difference Calculation**  
+   Compute either absolute differences or relative ratios of aligned images, masking pixels not sufficiently covered.
+
+5. **Bright Star Masking**  
+   Detects and optionally dilates masks around the brightest stars to exclude from threshold calculations or final display.
+
+6. **Local Noise Estimation**  
+   Calculates noise per image block using median absolute deviation converted to sigma, interpolated back to full image size.
+
+7. **Threshold Calculation and Application**  
+   Threshold can be absolute, percentile based, or sigma-based using noise estimates. Pixels below threshold are set to zero.
+
+8. **Rendering the Result**  
+   Differences are rendered into RGB heatmaps, with "signed" mode showing positive differences in red and negative in green, or "absolute" mode showing magnitude only.
+
+---
+
+## Output
+
+Returns a dictionary containing:  
+- The rendered difference image (PIL object).  
+- Threshold used and normalization applied.  
+- Pixel counts above threshold and total pixels considered.  
+- Metadata about coverage, image shapes, difference ranges, background mode, and masking parameters.
+
+---
+
+## Utility: WEBP Serialization
+
+Encodes the PIL image in WEBP format as an in-memory byte sequence for efficient storage and transmission without temporary files.
+
+---
+
+## Why This Matters
+
+This engine provides scientists with a powerful, flexible tool to detect and visualize subtle changes between observations, critical for discovering transient phenomena or monitoring variable objects across wide sky regions.
+
+---

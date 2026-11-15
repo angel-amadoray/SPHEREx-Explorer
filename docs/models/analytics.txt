@@ -1,0 +1,48 @@
+---
+
+# Data Models for Spectral Profiles and JPL Integration
+
+## Overview  
+These models structure complex spectral profile data and responses for integration with the JPL small bodies database, enabling detailed characterization of celestial objects observed by SPHEREx.
+
+---
+
+## Key Models
+
+### VisualHints  
+Describes visual characteristics for 3D model suggestions, including base color, surface roughness, metal content, how much they glow, and estimated size category.
+
+### SpherexProfile  
+Represents a detailed classification of an object based on spectral data, including:
+
+- Candidate class (e.g., star-like, rocky-like) and confidence score.  
+- Color ratios and photometric fluxes capturing physical properties.  
+- Spectral coverage and number of sampled points.  
+- Data quality flags and indicators about image edges.  
+- Visual hints useful for 3D visualizations or further analysis.
+
+### SpectrumResponse  
+Combines a spectral profile with spatial and observational metadata, returning wavelength-dependent fluxes at specific pixel coordinates in a detector.
+
+---
+
+## JPL Integration Models
+
+### KnownObject  
+Represents a known celestial object identified in a field of view, with both catalog and pixel coordinates, brightness, motion data, and flags indicating whether it lies within the image frame.
+
+### KnownObjectsResponse  
+A comprehensive report from JPL integration, listing known objects in the sector and epoch with filtering details, count of objects filtered by criteria (offset, brightness), query parameters, and cache flag.
+
+### DifferenceResponse  
+Response containing details about an image difference analysis, including the URL of the output image, caching status, thresholds used, pixel counts above thresholds, and extra metadata.
+
+### IdentifyResponse  
+Returns detailed info for a pixel selected by the user, including its sky coordinates, how many known objects are nearby, classification as known or candidate, spectral profile if available, and whether the result was cached.
+
+---
+
+## Use Cases  
+These models enable integrated spectral analyses, object identification, and interactive exploration of SPHEREx observations, linking raw spectral data to known catalogued bodies and supporting visual and scientific interpretation.
+
+---

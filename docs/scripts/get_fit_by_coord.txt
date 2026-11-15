@@ -1,0 +1,29 @@
+# SPHEREx Public QR2 FITS Search Script
+
+## What It Does  
+This script queries the Infrared Science Archive (IRSA) public dataset for SPHEREx’s QR2 release, searching for FITS files near specified celestial coordinates within a defined search radius.
+
+---
+
+## How It Works  
+
+1. **Coordinates and Radius Definition**  
+   The user selects target sky coordinates (RA and Dec) in degrees and defines a search radius in arcseconds.
+
+2. **Querying the IRSA Archive**  
+   The script performs a Simple Image Access (SIA) query to the IRSA service targeting the `spherex_qr2` collection.
+
+3. **Result Display**  
+   For each matching file found, the script extracts the filename from the full access URL and prints key metadata including observation ID, precise RA/Dec, and observation date.
+
+---
+
+## Example Usage  
+
+- Coordinates for the Galactic Center are preset and searched within 30 arcseconds here.  
+- Similar queries can be made for Orion Nebula or Rho Ophiuchi by changing the RA and Dec variables.
+
+---
+
+## Why It Matters  
+This example demonstrates how to efficiently access public SPHEREx archival data over the web for focused regions without downloading unnecessary data.

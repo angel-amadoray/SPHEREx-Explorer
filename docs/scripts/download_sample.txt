@@ -1,0 +1,48 @@
+# SPHEREx Level 2 FITS Downloader CLI
+
+## What It Is About  
+This command-line tool enables users to discover and download SPHEREx Level 2 FITS files from the public NASA IRSA S3 bucket. It supports listing data by planning periods, inspecting available observations, searching by celestial coordinates, and downloading selected files.
+
+---
+
+## Key Features
+
+### Modes of Operation
+
+- **List**: Lists all available planning periods in the dataset.
+
+- **Inspect**: Shows grouped observations by observation ID and visit for a specified planning period.
+
+- **Find By Coordinates**: Scans all observations’ headers to find those near given RA/Dec coordinates within a tolerance, without downloading full data.
+
+- **Download**: Downloads specified FITS files filtered by planning period, obs ID, visit, and detectors, placing them in a chosen output directory.
+
+- **Scan All**: Searches across all planning periods for observations near given coordinates.
+
+---
+
+## How It Works
+
+1. **S3 Client Setup**  
+   Uses an unsigned boto3 client to anonymously access the public S3 bucket.
+
+2. **Listing and Discovering Files**  
+   Retrieves keys (file paths) from S3 with prefixes matching planning periods and searches files based on regex matching standard SPHEREx FITS filename patterns.
+
+3. **Header Preview via HTTP Range Requests**  
+   Efficiently reads just the first 100KB of a FITS file header remotely to extract key metadata (RA, Dec, observation date), avoiding full downloads unless necessary.
+
+4. **Angular Distance Filtering**  
+   Uses spherical geometry to filter observations within the specified tolerance around the target coordinate.
+
+5. **Download Selection and Execution**  
+   Ensures requested detectors exist for the observation, resolves ambiguities by requiring obs ID and visit, creates local directories, and downloads files.
+
+6. **User-Friendly CLI Interface**  
+   Supports flexible command-line arguments for all modes with error checking and helpful output.
+
+---
+
+## Why It Matters
+
+This tool empowers scientists and engineers to efficiently locate and acquire relevant SPHEREx Level 2 data for analysis without downloading unnecessary files, leveraging cloud scale data browsing and selective retrieval.

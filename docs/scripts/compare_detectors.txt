@@ -1,0 +1,28 @@
+# FITS Header Analysis Script
+
+## What It Does  
+This script analyzes a collection of SPHEREx FITS files from a specified directory, extracting and printing key metadata from each file’s `IMAGE` header.
+
+---
+
+## Main Steps  
+
+1. **File Discovery**  
+   Searches for all `.fits` files in a directory corresponding to a sky sector and observation epoch.
+
+2. **Header Extraction**  
+   Opens each FITS file, accesses the `IMAGE` extension header, and retrieves:
+   - Detector number (`DETECTOR`)  
+   - Right ascension (`CRVAL1`)  
+   - Declination (`CRVAL2`)  
+   - Observation ID (`OBSID`)  
+   - Observation date (`DATE-OBS`)
+
+3. **Result Formatting**  
+   Prints a summary table listing each file’s detector, sky coordinates (RA, Dec), observation ID, and timestamp.
+
+---
+
+## Why It’s Useful
+
+This simple analysis helps verify metadata consistency, understand coverage, and plan further data processing by quickly summarizing many FITS headers.

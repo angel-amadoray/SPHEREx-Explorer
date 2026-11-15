@@ -1,0 +1,104 @@
+# Images API Module
+
+## What It Is About  
+This module provides endpoints related to astronomical image composition and metadata. It can produce color composite images of sky sectors based on spectral data, and report which detectors have available data for given sectors and epochs.
+
+## How It Works
+
+### 1. Generating Spectral Composite Images  
+This endpoint generates a color composite image for a specified sky sector, epoch, and detector. It offers detailed control of image contrast, brightness range, compression quality, and downsampling, with optional masking of bad pixels.
+
+- Validates that the sector and epoch exist.
+- Checks cache for existing composite image matching parameters.
+- Loads the raw FITS image if cached data is missing.
+- Processes the image spectrum to produce a visually enhanced composite.
+- Saves the processed image in cache, returning its URL.
+
+```python
+@router.get("/composite", response_model=CompositeResponse)
+def composite(
+    request: Request,
+    sector_id: str,
+    epoch: str,
+    detector: int = Query(1, ge=1, le=6),
+    stretch_scale: float = Query(10.0, gt=0, le=100),
+    p_low: float = Query(1.0, ge=0.0, lt=50.0),
+    p_high: float = Query(99.5, gt=50.0, le=100.0),
+    quality: int = Query(85, ge=10, le=100),
+    downsample: int = Query(8, ge=1, le=32),
+    mode: str = Query("per_row", pattern="^(global|per_row)$"),
+    fill_masked: bool = Query(True),
+    obs_id: str | None = None,
+    visit: int | None = None,
+):
+    hotspot = request.app.state.hotspots.get(sector_id)
+    if hotspot is None:
+        raise HTTPException(404, f"Sector '{sector_id}' not found")
+    if epoch not in hotspot.epochs:
+        raise HTTPException(
+            400,
+            f"Epoch '{epoch}' not available for sector '{sector_id}'. Available: {hotspot.epochs}",
+        )
+
+    params = { ... }  # dictionary of parameters
+
+    hit = cache.get("composite", params)
+    if hit:
+        return CompositeResponse(url=cache.url_for(hit), cached=True, parameters=params)
+
+    hdul = fl.load_local_fits(...)
+    img = ce.spectral_paint(hdul, ...)
+    hdul.close()
+
+    buf = ce.to_webp_bytes(img, quality=quality)
+    path = cache.put("composite", params, buf)
+    return CompositeResponse(url=cache.url_for(path), cached=False, parameters=params)
+```
+
+---
+
+### 2. Listing Available Detectors  
+Returns a list of detector IDs (1 to 6) for which image data exists locally or remotely (OCI) for a given sector and epoch.
+
+- Searches local storage for detector data.
+- Optionally queries OCI remote storage if enabled.
+- Combines and returns unique detector IDs discovered.
+
+```python
+@router.get("/available-detectors")
+def get_available_detectors(sector_id: str, epoch: str):
+    available = set()
+    local_files = fl.find_sector_files(sector_id, epoch)
+    for f in local_files:
+        meta = fl.parse_filename_metadata(f.name)
+        if meta and "detector" in meta:
+            available.add(meta["detector"])
+
+    if settings.oci_download_enabled:
+        try:
+            remote_files = storage.list_remote_files(sector_id, epoch)
+            for f in remote_files:
+                meta = fl.parse_filename_metadata(f["filename"])
+                if meta and "detector" in meta:
+                    available.add(meta["detector"])
+        except Exception as e:
+            logger.warning(f"Error listing detectors in OCI for {sector_id}/{epoch}: {e}")
+
+    return {
+        "sector_id": sector_id,
+        "epoch": epoch,
+        "detectors": sorted(list(available))
+    }
+```
+
+---
+
+## Benefits  
+- Efficient caching mechanism saves processing time and resources.  
+- Fine control of image appearance for scientific visualization.  
+- Transparent and easy lookup of which detector data is accessible.  
+- Supports both local and remote (cloud) data sources seamlessly.
+
+## Use Cases  
+Useful for image rendering services in astronomy platforms, exposure planning tools, and user-facing web interfaces requiring ready-to-use spectral composites and metadata.
+

@@ -1,0 +1,36 @@
+# Hotspots API Module
+
+## What It Is About  
+This module provides a simple API to retrieve information about predefined sky sectors called "hotspots." These hotspots represent areas of interest in the sky relevant to astronomical observations.
+
+## How It Works
+
+### 1. Listing All Hotspots  
+Returns a list of all available hotspots loaded in the application’s state. This allows clients to discover all sectors currently supported.
+
+```python
+@router.get("", response_model=list[Hotspot])
+def list_hotspots(request: Request):
+    return request.app.state.hotspots.all()
+```
+
+### 2. Retrieving a Single Hotspot  
+Given a sector identifier, the API returns detailed information about that specific hotspot. If the sector does not exist, it responds with a 404 error.
+
+```python
+@router.get("/{sector_id}", response_model=Hotspot)
+def get_hotspot(sector_id: str, request: Request):
+    h = request.app.state.hotspots.get(sector_id)
+    if h is None:
+        raise HTTPException(status_code=404, detail=f"Sector '{sector_id}' not found")
+    return h
+```
+
+## Benefits  
+- Provides quick and easy access to sector metadata for clients.  
+- Supports discovery of all sectors or details of individual sectors.  
+- Returns clear error messages for invalid sector requests.
+
+## Use Cases  
+Ideal for frontends or services needing to list or display information about observable sky regions, enabling dynamic UI elements or filtering based on hotspots.
+

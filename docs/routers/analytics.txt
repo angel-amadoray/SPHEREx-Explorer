@@ -1,0 +1,243 @@
+# Analytics API Module
+
+## What It Is About  
+This module implements an API to analyze astronomical image data. It offers endpoints for computing differences between images, identifying known celestial objects within a field of view, profiling spectra of pixels, and more. The system efficiently handles large datasets and uses caching to improve performance.
+
+---
+
+## How It Works
+
+### 1. Image Difference Calculation  
+This endpoint computes the difference between two image epochs for a specified sky sector and detector. Various parameters control background noise removal, normalization, masking, and thresholding. It leverages cached results to avoid recomputation.
+
+- Validates requested sector and epochs.
+- Checks cache with stable keys based on parameters.
+- Loads image data or raises errors if missing or invalid.
+- Computes the difference with precise options.
+- Stores and returns the processed image and metadata.
+
+
+
+```python
+@router.get("/difference", response_model=DifferenceResponse)
+def difference(
+    # many query parameters omitted for brevity
+):
+    hotspot = request.app.state.hotspots.get(sector_id)
+    if hotspot is None:
+        raise HTTPException(404, f"Sector '{sector_id}' not found")
+
+    # Validate epochs
+    for ep in (epoch_from, epoch_to):
+        if ep not in hotspot.epochs:
+            raise HTTPException(400, f"Epoch '{ep}' not available")
+
+    # Prepare parameters and check cache
+    params = { ... }
+    hit = cache.get("difference", params)
+    if hit:
+        meta_path = hit.with_suffix(".json")
+        meta = json.loads(meta_path.read_text()) if meta_path.is_file() else {}
+        return DifferenceResponse(
+            url=cache.url_for(hit),
+            cached=True,
+            parameters=params,
+            threshold=meta.get("threshold", 0.0),
+            n_pixels_above=meta.get("n_pixels_above", 0),
+            n_pixels_total=meta.get("n_pixels_total", 0),
+            metadata=meta.get("metadata", {}),
+        )
+
+    # Load FITS files for both epochs, compute difference
+    hdul_t1 = fl.load_local_fits(...)
+    hdul_t2 = fl.load_local_fits(...)
+    result = de.compute_difference(...)
+
+    # Convert to image, cache result and sidecar metadata
+    buf = de.to_webp_bytes(result["image"], quality=quality)
+    path = cache.put("difference", params, buf)
+    path.with_suffix(".json").write_text(json.dumps({
+        "threshold": result["threshold"],
+        "normalize": result["normalize"],
+        "n_pixels_above": result["n_pixels_above"],
+        "n_pixels_total": result["n_pixels_total"],
+        "metadata": result["metadata"],
+    }))
+
+    return DifferenceResponse(
+        url=cache.url_for(path),
+        cached=False,
+        parameters=params,
+        threshold=result["threshold"],
+        n_pixels_above=result["n_pixels_above"],
+        n_pixels_total=result["n_pixels_total"],
+        metadata=result["metadata"],
+    )
+```
+
+---
+
+### 2. Known Objects Query  
+This endpoint accesses a JPL database to identify known objects in a sky region. It applies filters like magnitude and radius, supports caching, and optionally translates celestial coordinates to image pixel positions.
+
+- Validates sector and epoch.
+- Loads necessary image data for observation metadata.
+- Constructs observer information and coordinates.
+- Checks cache or queries JPL API with filters.
+- Parses results, optionally computing pixel coordinates.
+- Stores results in cache and returns detailed response.
+
+```python
+@router.get("/known-objects", response_model=KnownObjectsResponse)
+def known_objects(
+    # query parameters omitted for brevity
+):
+    hotspot = request.app.state.hotspots.get(sector_id)
+    if hotspot is None:
+        raise HTTPException(404, f"Sector '{sector_id}' not found")
+    if epoch not in hotspot.epochs:
+        raise HTTPException(400, f"Epoch '{epoch}' not available")
+
+    hdul = fl.load_local_fits(...)
+    header = hdul["IMAGE"].header
+    obs_time_iso = header.get("DATE-OBS")[:19]
+
+    # Define observer and center coordinates
+    observer = {...}
+    ra_center = ...
+    dec_center = ...
+
+    params = {...}
+    hit = cache.get("known_objects", params)
+    if hit:
+        payload = json.loads(hit.read_text(encoding="utf-8"))
+        return KnownObjectsResponse(**payload, cached=True)
+
+    result = jpl_api.find_known_objects(...)
+    objects_parsed = [...]
+
+    response = KnownObjectsResponse(
+        sector_id=sector_id,
+        epoch=epoch,
+        ra_center_deg=ra_center,
+        dec_center_deg=dec_center,
+        obs_time_iso=obs_time_iso,
+        objects=objects_parsed,
+        cached=False,
+    )
+
+    cache.put("known_objects", params, json.dumps(response.model_dump()).encode("utf-8"))
+    return response
+```
+
+---
+
+### 3. Identify Objects by Pixel Click  
+Allows users to click on a pixel in the image and get known celestial objects near that coordinate, along with conversion from pixels to RA/Dec.
+
+- Converts (x, y) pixel to celestial coordinates.
+- Retrieves observation info from image metadata.
+- Queries JPL for known objects near the converted coordinates.
+- Includes optional spectral profile analysis of the pixel.
+- Caches and returns matched objects or candidates.
+
+```python
+@router.get("/identify", response_model=IdentifyResponse)
+def identify(
+    # parameters omitted
+):
+    hotspot = request.app.state.hotspots.get(sector_id)
+    if hotspot is None:
+        raise HTTPException(404, f"Sector '{sector_id}' not found")
+
+    hdul = fl.load_local_fits(...)
+    ra_deg, dec_deg = fl.pixel_to_world(hdul, pixel_x, pixel_y)
+    obs_time_iso = hdul["IMAGE"].header.get("DATE-OBS")[:19]
+
+    observer = {...}
+    params = {...}
+    hit = cache.get("identify", params)
+    if hit:
+        payload = json.loads(hit.read_text(encoding="utf-8"))
+        return IdentifyResponse(**payload, cached=True)
+
+    result = jpl_api.find_known_objects(...)
+    known = [...]
+
+    profile_data = None
+    if include_profile:
+        hdul_prof = fl.load_local_fits(...)
+        profile_data = sa.analyze_pixel(hdul_prof, pixel_x, pixel_y, known_objects=known)
+
+    response = IdentifyResponse(
+        sector_id=sector_id,
+        epoch=epoch,
+        pixel_x=pixel_x,
+        pixel_y=pixel_y,
+        ra_deg=ra_deg,
+        dec_deg=dec_deg,
+        known_objects=known,
+        is_known=bool(known),
+        is_candidate=not known,
+        spherex_profile=profile_data,
+        cached=False,
+    )
+
+    cache.put("identify", params, json.dumps(response.model_dump()).encode("utf-8"))
+    return response
+```
+
+---
+
+### 4. Spectrum Analysis of Pixels  
+This endpoint analyzes the spectral profile of a specific pixel in an image, returning wavelength and flux data.
+
+- Validates sector and epoch.
+- Loads image and ensures pixel coordinates are valid.
+- Calls spectral analyzer service on that pixel.
+- Returns detailed spectral data.
+
+```python
+@router.get("/spectrum", response_model=SpectrumResponse)
+def spectrum(
+    # parameters omitted
+):
+    hotspot = request.app.state.hotspots.get(sector_id)
+    if hotspot is None:
+        raise HTTPException(404, f"Sector '{sector_id}' not found")
+
+    hdul = fl.load_local_fits(...)
+    ny, nx = hdul["IMAGE"].data.shape
+    if pixel_x >= nx or pixel_y >= ny:
+        raise HTTPException(400, "Pixel out of bounds")
+
+    result = sa.analyze_pixel(hdul, pixel_x, pixel_y)
+    wavelengths = result.pop("spectrum_wavelengths", [])
+    fluxes = result.pop("spectrum_fluxes", [])
+    profile = SpherexProfile(**result)
+
+    return SpectrumResponse(
+        sector_id=sector_id,
+        epoch=epoch,
+        detector=detector,
+        pixel_x=pixel_x,
+        pixel_y=pixel_y,
+        wavelengths_um=wavelengths,
+        flux_per_row=fluxes,
+        profile=profile,
+    )
+```
+
+---
+
+## Benefits  
+- Efficient and scalable astronomical data analysis via API.  
+- Extensive caching reduces repeated expensive computations and API calls.  
+- Supports rich filtering and querying of known celestial objects.  
+- Integrates spectral and positional analysis with precise user control.  
+- Handles error conditions gracefully with informative HTTP responses.
+
+## Ideal Use Cases  
+Applications that require dynamic astronomical image analytics, such as sky survey platforms, research tools, and educational portals.
+
+

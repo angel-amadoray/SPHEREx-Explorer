@@ -1,0 +1,35 @@
+
+---
+
+# Astrometry Data Models
+
+## What They Represent  
+These models capture spatial referencing information for astronomical images, enabling precise conversion between sky coordinates and image pixels.
+
+---
+
+## Key Models
+
+### AstrometryWCS  
+Represents the World Coordinate System (WCS) parameters of an image, including:
+
+- Reference sky coordinates (crval1, crval2).  
+- Reference pixel coordinates (crpix1, crpix2).  
+- Coordinate types, e.g. RA and Dec (ctype1, ctype2).  
+- Transformation matrix (`cd`) linking pixel offsets to angular sky offsets.  
+- A flag indicating if complex distortion (SIP) correction is present.
+
+### AstrometryResponse  
+Provides metadata about an astrometric image:
+
+- Identifiers for sector, epoch, and detector used.  
+- Filename and image shape (height and width in pixels).  
+- The associated WCS information to enable spatial mapping.
+
+---
+
+## Practical Use  
+These models are critical for converting user interactions on images (like clicking pixels) into sky positions and vice versa, supporting accurate spatial analyses and visualizations.
+
+---
+

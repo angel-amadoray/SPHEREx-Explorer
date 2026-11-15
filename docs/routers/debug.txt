@@ -1,0 +1,153 @@
+# Debug API Module for Astronomical Data
+
+## What It Is About  
+This module offers various endpoints for debugging and inspecting astronomical FITS files related to sky sectors and observation epochs. It supports file summaries, detailed header information, wavelength analysis, and wavelength grid visualizations, facilitating diagnostics and data exploration.
+
+---
+
+## How It Works
+
+### 1. Sector Files Summary  
+Lists all FITS files available for a given sector and epoch. Provides file metadata including size, detector index, observation ID, visit number, and processing date to give a quick overview.
+
+```python
+@router.get("/sector/{sector_id}/{epoch}", response_model=SectorFilesResponse)
+def debug_sector(sector_id: str, epoch: str):
+    sector_dir = Path(settings.data_dir) / sector_id / epoch
+    files = fl.find_sector_files(sector_id, epoch)
+    summaries = [FileSummary(
+        filename=f.name,
+        size_mb=round(f.stat().st_size / 1e6, 2),
+        **{
+            k: v
+            for k, v in fl.parse_filename_metadata(f.name).items()
+            if k in ("detector", "visit", "obs_id", "processing_date")
+        },
+    ) for f in files]
+    return SectorFilesResponse(
+        sector_id=sector_id,
+        epoch=epoch,
+        directory=str(sector_dir.resolve()),
+        exists=sector_dir.is_dir(),
+        file_count=len(files),
+        files=summaries,
+    )
+```
+
+---
+
+### 2. FITS Header Details  
+Fetches and parses the headers of a specific FITS file, extracting coordinate data, image metadata, and extensions for inspection.
+
+```python
+@router.get("/header/{sector_id}/{epoch}/{filename}", response_model=HeaderResponse)
+def debug_header(sector_id: str, epoch: str, filename: str):
+    p = _resolve_file(sector_id, epoch, filename)
+    info = fl.read_header_info(p)
+    return HeaderResponse(
+        filename=filename,
+        size_mb=round(p.stat().st_size / 1e6, 2),
+        parsed=fl.parse_filename_metadata(filename),
+        coordinates=info["coordinates"],
+        extensions=info["extensions"],
+        primary_header=info["primary_header"],
+        image_header=info["image_header"],
+    )
+```
+
+---
+
+### 3. Wavelength Profile Analysis  
+Provides wavelength range and spectral profiles (along X and Y axes) of a given FITS image, including the central pixel wavelength, helping investigate the spectral geometry.
+
+```python
+@router.get("/wavelength/{sector_id}/{epoch}/{filename}", response_model=WavelengthResponse)
+def debug_wavelength(sector_id: str, epoch: str, filename: str):
+    p = _resolve_file(sector_id, epoch, filename)
+    with fl.open_mef(p) as hdul:
+        wmin, wmax = fl.wavelength_range(hdul)
+        ny, nx = hdul["IMAGE"].data.shape
+        wcs_spec = fl.get_spectral_wcs(hdul)
+        center = wcs_spec.pixel_to_world(nx // 2, ny // 2)
+        center_w = fl._quantity_to_array(center[0]).item()
+        profiles = fl.wavelength_profiles(hdul, n_samples=20)
+        det_hdr = int(hdul["IMAGE"].header.get("DETECTOR", 0)) or None
+    return WavelengthResponse(
+        filename=filename,
+        detector_from_name=fl.parse_filename_metadata(filename).get("detector"),
+        detector_from_header=det_hdr,
+        wavelength_range_um=(wmin, wmax),
+        center_pixel_wavelength_um=float(center_w),
+        profile_along_x=[...],  # profile points along X axis
+        profile_along_y=[...],  # profile points along Y axis
+        image_shape=profiles["image_shape"],
+    )
+```
+
+---
+
+### 4. WCS-Wave Table Inspection  
+Examines the spectral wavelength table extension within the FITS file, summarizing column details, wavelengths range, and counts to verify spectral calibration data.
+
+```python
+@router.get("/wcs_wave/{sector_id}/{epoch}/{filename}", response_model=WcsWaveTableResponse)
+def debug_wcs_wave(sector_id: str, epoch: str, filename: str):
+    p = _resolve_file(sector_id, epoch, filename)
+    with fl.open_mef(p) as hdul:
+        table_hdu = fl._get_ext(hdul, "WCS-WAVE")
+        data = table_hdu.data
+        cols = list(data.names)
+        column_details = {c: _summarize_column(data[c]) for c in cols}
+        wave_values = np.asarray(data["WAVELENGTH" if "WAVELENGTH" in cols else cols[0]], dtype=float).ravel()
+    return WcsWaveTableResponse(
+        extension="WCS-WAVE",
+        n_rows=len(data),
+        columns=cols,
+        column_details=column_details,
+        wavelength_min=float(np.nanmin(wave_values)),
+        wavelength_max=float(np.nanmax(wave_values)),
+        wavelength_count=int(wave_values.size),
+    )
+```
+
+---
+
+
+
+### 5. Wavelength Grid Generation  
+Generates a low-resolution 2D grid of wavelength values sampled uniformly across the image, providing a spatial overview of the spectral variation in the FITS image.
+
+```python
+@router.get("/wavelength_grid/{sector_id}/{epoch}/{filename}", response_model=WavelengthGridResponse)
+def debug_wavelength_grid(sector_id: str, epoch: str, filename: str, n: int = 10):
+    p = _resolve_file(sector_id, epoch, filename)
+    with fl.open_mef(p) as hdul:
+        image = hdul["IMAGE"].data
+        ny, nx = image.shape
+        xs = np.linspace(0, nx - 1, n).astype(int)
+        ys = np.linspace(0, ny - 1, n).astype(int)
+        xx, yy = np.meshgrid(xs, ys)
+        wcs_spec = fl.get_spectral_wcs(hdul)
+        world = wcs_spec.pixel_to_world(xx, yy)
+        wave = fl._quantity_to_array(world[0])
+        bw = fl._quantity_to_array(world[1])
+    return WavelengthGridResponse(
+        n=n,
+        xs=xs.tolist(),
+        ys=ys.tolist(),
+        wavelengths_um=np.round(wave, 5).tolist(),
+        bandwidths_um=np.round(bw, 5).tolist(),
+    )
+```
+
+---
+
+## Benefits  
+- Facilitates in-depth inspection and diagnostics of astronomical data files.  
+- Presents concise summaries and metadata for quick understanding of dataset contents.  
+- Helps visualize wavelength distributions and spectral properties.  
+- Identifies potential file or data issues early with structured error handling.
+
+## Use Cases  
+Ideal for developers, scientists, or engineers working on astronomical data pipelines needing detailed insight into the raw FITS data, metadata, and spectral properties.
+

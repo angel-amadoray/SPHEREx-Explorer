@@ -1,0 +1,18 @@
+
+---
+
+# CompositeResponse Data Model
+
+## What It Represents  
+This model encapsulates the response for a composite image request in the SPHEREx system.
+
+- **url**: The link to the generated composite image, ready to be accessed or displayed.  
+- **cached**: A boolean flag indicating whether the image was retrieved from cache (true) or newly generated (false).  
+- **parameters**: A dictionary containing the input parameters used to produce the composite image.
+
+---
+
+## Practical Use  
+Used to communicate the result of a composite image generation process, allowing clients to efficiently handle cached results and understand the conditions used to create the image.
+
+---

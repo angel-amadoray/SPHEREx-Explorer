@@ -1,0 +1,83 @@
+# JPL Small Body Identification API Script
+
+## What It Is About  
+This script demonstrates how to query NASA’s JPL SSD API to identify small bodies (asteroids, comets) within a specified field of view (FOV) in the sky. It tests several configurations of the observation vector and filtering options to compare results.
+
+
+## How It Works
+
+### 1. Base Field-of-View Configuration  
+Defines the center of the search in right ascension (RA) and declination (Dec), angular half-widths of the FOV, small body kind, and whether elements (orbital parameters) should be requested.
+
+```python
+BASE = {
+    "fov-ra-center": "10-00-00",
+    "fov-dec-center": "10-00-00",
+    "fov-ra-hwidth": 3.0,
+    "fov-dec-hwidth": 3.0,
+    "sb-kind": "a",
+    "req-elem": "false",
+}
+```
+
+### 2. Observation Vectors and Query Configurations  
+Defines several test cases with combinations of using full state vectors (position + velocity) or position only, and whether a two-pass search is enabled.
+
+```python
+XOBS_FULL = "3357.540286915801,-2950.2970881889973,-5442.019747466086,3.1889978886327373,-4.953464629399665,4.66464957446033"
+XOBS_POS_ONLY = "3357.540286915801,-2950.2970881889973,-5442.019747466086"
+
+configs = [
+    {
+        "name": "A) two-pass=false, mag-required=false, xobs completo",
+        "params": {**BASE, "obs-time": "2025-05-01_12:15:52",
+                   "two-pass": "false", "mag-required": "false", "xobs": XOBS_FULL},
+    },
+    {
+        "name": "B) two-pass=false, mag-required=false, solo posición",
+        "params": {**BASE, "obs-time": "2025-05-01_12:15:52",
+                   "two-pass": "false", "mag-required": "false", "xobs": XOBS_POS_ONLY},
+    },
+    {
+        "name": "C) two-pass=true, mag-required=false, xobs completo",
+        "params": {**BASE, "obs-time": "2025-05-01_12:15:52",
+                   "two-pass": "true", "suppress-first-pass": "true",
+                   "mag-required": "false", "xobs": XOBS_FULL},
+    },
+]
+```
+
+### 3. Executing Queries and Processing Results  
+Iterates over the configurations, sends HTTP GET requests to the API endpoint with current parameters, retrieves JSON responses, and prints summary information about detected objects and pass counts. It also handles and reports errors.
+
+```python
+for cfg in configs:
+    print(f"\n{'='*70}\n{cfg['name']}\n{'='*70}")
+    try:
+        r = requests.get(URL, params=cfg["params"], timeout=120)
+        print(f"HTTP {r.status_code}")
+        data = r.json()
+        print(f"n_first_pass:  {data.get('n_first_pass', 'N/A')}")
+        print(f"n_second_pass: {data.get('n_second_pass', 'N/A')}")
+        print(f"n_objects:     {data.get('n_objects', 'N/A')}")
+        if data.get("data_first_pass"):
+            print(f"Primeros 3 objetos: {data['data_first_pass'][:3]}")
+        if data.get("data_second_pass"):
+            print(f"Primeros 3 objetos (2nd): {data['data_second_pass'][:3]}")
+        if "error" in data:
+            print(f"ERROR: {data['error']}")
+    except Exception as e:
+        print(f"Excepción: {e}")
+```
+
+---
+
+## Benefits  
+- Demonstrates how to query for small bodies in a specified sky area and time.  
+- Tests effects of different observation data and search parameters.  
+- Provides insight into results with both single and two-pass detection methods.  
+- Easy to modify for other FOV centers, dates, or observational parameters.
+
+## Use Cases  
+Useful for researchers and software systems that need to identify known asteroids or comets within fields of view for survey planning, data annotation, or real-time observations.
+

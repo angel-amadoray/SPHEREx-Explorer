@@ -1,0 +1,74 @@
+# Multi-Detector Spectral Analysis for SPHEREx
+
+## What It Is About  
+SPHEREx carries three physically separated telescopes, each with two spectral detectors sensitive to different infrared wavelength ranges:
+
+- Telescope 1: Detectors D1 (0.75–1.09 μm) and D4 (2.42–3.82 μm)  
+- Telescope 2: Detectors D2 (1.10–1.62 μm) and D5 (3.83–4.41 μm)  
+- Telescope 3: Detectors D3 (1.63–2.41 μm) and D6 (4.42–5.00 μm)
+
+Any object in the sky is observed by only one telescope per visit, providing spectral information at two wavelengths (one per detector in the pair).
+
+---
+
+## How It Works (Step-by-Step)
+
+1. **Determine Detector Pair Covering the Object**  
+   For the target celestial coordinates (RA, Dec), the system identifies which telescope pair observes that position.
+
+2. **Aperture Photometry on Both Detectors**  
+   For both detectors of the pair, flux (brightness) is measured by summing the light in a small aperture around the object’s pixel position.
+
+3. **Calculate Flux Ratio**  
+   The ratio of the long wavelength detector flux to the short wavelength flux is computed, with error propagation to estimate uncertainty.
+
+4. **Classify Source Based on Flux Ratio**  
+   - Ratio < 0.7: Strong absorption (e.g., presence of ice for pair D1+D4)  
+   - Ratio < 0.9: Weak absorption  
+   - Ratio 0.9–1.1: Continuum (likely a star)  
+   - Ratio > 1.1: Emission (e.g., warm dust)  
+   - Signal-to-noise ratio (SNR) below 3: Classification is undetermined
+
+---
+
+## Detailed Explanation of the Code
+
+- **Blackbody Ratio Calculation (`_bb_fnu_ratio`)**  
+  Models the expected flux ratio for a perfect thermal emitter at temperature T, aiding in interpretation.
+
+- **Color Temperature Inversion (`_color_temperature`)**  
+  From the measured ratio, calculates an effective “color temperature” assuming blackbody radiation.
+
+- **Spatial Coordinate Conversion (`_pixel_for_world`)**  
+  Converts sky coordinates (RA/Dec) to pixel coordinates on the detector using spatial WCS transformations.
+
+- **Detector Photometry (`_photometry_detector`)**  
+  For a detector, extracts the flux, error, SNR, and pixel position corresponding to the celestial point.
+
+- **Flux Ratio and Classification Computation**  
+  Calculates ratio and its error, applying cuts based on flux validity and SNR, then classifies the source based on temperature ranges reflecting stellar or dust properties.
+
+---
+
+## Public Interface: `analyze_pair`
+
+Given sector, epoch, and sky coordinates, this function:
+
+- Finds the telescope detector pair covering the point.  
+- Performs photometry to obtain fluxes and SNRs.  
+- Computes flux ratio and error.  
+- Classifies the object (hot star, sun-like star, cool star, dusty object, or undetermined).  
+- Returns detailed results for the short and long detectors, ratio, and classification.
+
+If no detector pair covers the location, it returns an undetermined classification.
+
+---
+
+## Why It Matters
+
+- Enables physical interpretation of sources by comparing flux at two strategically separated infrared bands.  
+- Helps identify features like ice absorption, dust emission, or stellar types from minimal spectral points.  
+- Supports efficient spectral classification without full spectroscopy, optimizing SPHEREx’s survey data utility.
+
+---
+
